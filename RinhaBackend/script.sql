@@ -1,5 +1,5 @@
 -- Coloque scripts iniciais aqui
-CREATE TABLE IF NOT EXISTS clientes (id SERIAL, limite BIGINT, saldo_inicial BIGINT DEFAULT 0);
+CREATE TABLE IF NOT EXISTS clientes (id SERIAL, limite BIGINT, saldo BIGINT DEFAULT 0);
 
 CREATE UNIQUE INDEX IF NOT EXISTS clientes_id_idx ON clientes (id);
 

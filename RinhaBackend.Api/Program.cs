@@ -1,3 +1,4 @@
+using System.Data;
 using Npgsql;
 using RinhaBackend.Api.Clientes;
 using RinhaBackend.Api.Transacoes;
@@ -11,42 +12,53 @@ builder.Services.AddNpgsqlDataSource(
 
 var app = builder.Build();
 
-app.MapPost("/clientes/{id}/transacoes", async (int id, HttpRequest request, NpgsqlConnection conn) =>
+app.MapPost("/clientes/{id}/transacoes", async (int id, HttpRequest request, NpgsqlDataSource dataSource) =>
 {
+    var transacao = await request.ReadFromJsonAsync<Transacao>();
+    if (transacao == null)
+    {
+        return Results.BadRequest();
+    }
+
+    Cliente cliente;
+
+    NpgsqlConnection? conn = null;
+    NpgsqlTransaction? dbTransaction = null;
+    
     try
     {
-        var transacao = await request.ReadFromJsonAsync<Transacao>();
-        if (transacao == null)
-            return Results.BadRequest();
-
-        await using var cmd = new NpgsqlCommand("SELECT id, limite, saldo FROM clientes WHERE id = $1", conn)
+        conn = await dataSource.OpenConnectionAsync();
+        await using (dbTransaction = conn.BeginTransaction(IsolationLevel.RepeatableRead))
+        
+        await using (var cmd = new NpgsqlCommand("SELECT id, limite, saldo FROM clientes WHERE id = $1",
+                         conn,
+                         dbTransaction))
         {
-            Parameters = { new() { Value = 1 } }
-        };
+            cmd.Parameters.Add(new() { Value = 1 });
 
-        await using var reader = await cmd.ExecuteReaderAsync();
-        if (!await reader.ReadAsync())
-            return Results.NotFound();
+            await using var reader = await cmd.ExecuteReaderAsync();
+            if (!await reader.ReadAsync())
+                return Results.NotFound();
+            
 
-        var cliente = new Cliente(
-            reader.GetInt32(0),
-            reader.GetInt64(1),
-            reader.GetInt64(2)
-        );
+            cliente = new Cliente(
+                reader.GetInt32(0),
+                reader.GetInt64(1),
+                reader.GetInt64(2)
+            );
 
-        cliente.ExecutaTransacao(transacao);
-        
-        await using var cmd2 = new NpgsqlCommand("UPDATE clientes SET saldo = $1 WHERE id = $2", conn)
+
+            cliente.ExecutaTransacao(transacao);
+        }
+
+        await using (var cmd2 = new NpgsqlCommand("UPDATE clientes SET saldo = $1 WHERE id = $2", conn, dbTransaction))
         {
-            Parameters =
-            {
-                new() { Value = cliente.Saldo },
-                new() { Value = cliente.Id }
-            }
-        };
-        
-        await cmd2.ExecuteNonQueryAsync();
-        
+            cmd2.Parameters.Add(new() { Value = cliente.Saldo });
+            cmd2.Parameters.Add(new() { Value = cliente.Id });
+
+            await cmd2.ExecuteNonQueryAsync();
+        }
+
         var clienteDto = new
         {
             cliente.Limite, cliente.Saldo
@@ -61,7 +73,15 @@ app.MapPost("/clientes/{id}/transacoes", async (int id, HttpRequest request, Npg
     catch (Exception e)
     {
         Console.WriteLine(e);
-        throw;
+        return Results.Problem();
+    }
+    finally
+    {
+        if (dbTransaction != null)
+            await dbTransaction.DisposeAsync();
+        
+        if (conn != null)
+            await conn.CloseAsync();
     }
 });
 
