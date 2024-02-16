@@ -10,7 +10,7 @@ services:
       dockerfile: RinhaBackend.Api/Dockerfile
     hostname: api01
     environment:
-      - DB_CONNECTION_STRING=Username=admin;Password=123;Host=db;Database=rinha;Pooling=true;MaxPoolSize=15;Connection Lifetime=0;
+      - DB_CONNECTION_STRING=Username=admin;Password=123;Host=db;Database=rinha;Pooling=true;Maximum Pool Size=15;No Reset On Close=true;Connection Lifetime=0;
       - ASPNETCORE_URLS=http://+:8080;
     
     # Não é necessário expor qualquer porta além da porta do load balancer,
@@ -23,7 +23,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.6"
+          cpus: "0.4"
           memory: "200MB"
 
   api02:
@@ -31,7 +31,7 @@ services:
     <<: *api
     hostname: api02
     environment:
-      - DB_CONNECTION_STRING=Username=admin;Password=123;Host=db;Database=rinha;Pooling=true;MaxPoolSize=15;Connection Lifetime=0;
+      - DB_CONNECTION_STRING=Username=admin;Password=123;Host=db;Database=rinha;Pooling=true;Maximum Pool Size=15;No Reset On Close=true;Connection Lifetime=0;
       - ASPNETCORE_URLS=http://+:8080
     ports:
       - "8080"
@@ -49,7 +49,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.17"
+          cpus: "0.14"
           memory: "10MB"
 
   db:
@@ -70,7 +70,7 @@ services:
           # aqui declarados é de 1.5 unidades de CPU e 550MB
           # de memória. A distribuição feita aqui é apenas
           # um exemplo – distribua como quiser.
-          cpus: "0.13"
+          cpus: "0.2"
           memory: "140MB"
 
 # O uso do modo `bridge` deve ser adequado à carga que será usada no teste.

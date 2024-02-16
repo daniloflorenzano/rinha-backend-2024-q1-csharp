@@ -2,27 +2,37 @@ using RinhaBackend.Api.Transacoes;
 
 namespace RinhaBackend.Api.Clientes;
 
-public sealed class Cliente(int id, long limite, long saldo)
+public sealed class Cliente(int id, int limite, int saldo)
 {
     public int Id { get; set; } = id;
-    public long Limite { get; set; } = limite;
-    public long Saldo { get; set; } = saldo;
-    
+    public int Limite { get; set; } = limite;
+    public int Saldo { get; set; } = saldo;
+    private int SaldoLimite => Limite * -1;
+
     public void ExecutaTransacao(Transacao transacao)
     {
-        if (transacao.Tipo == "c")
-            Saldo -= transacao.Valor;
-        
-        
-        else if (transacao.Tipo == "d")
+        if (transacao.Valor <= 0)
+            throw new TransacaoInvalidaException("Valor inválido");
+
+
+        switch (transacao.Tipo)
         {
-            var novoSaldo = Saldo - transacao.Valor;
-            var saldoLimite = Limite - (Limite * 2);
+            case "c":
+                Saldo += transacao.Valor;
+                break;
             
-            if (novoSaldo < saldoLimite)
-                throw new TransacaoInvalidaException("Saldo insuficiente");
+            case "d":
+            {
+                var novoSaldo = Saldo - transacao.Valor;
+
+                if (novoSaldo > SaldoLimite)
+                    Saldo = novoSaldo;
+                
+                break;
+            }
             
-            Saldo = novoSaldo;
+            default:
+                throw new TransacaoInvalidaException("Limite insuficiente");
         }
     }
 }

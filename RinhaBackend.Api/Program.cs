@@ -1,5 +1,6 @@
 using System.Data;
 using Npgsql;
+using RinhaBackend.Api;
 using RinhaBackend.Api.Clientes;
 using RinhaBackend.Api.Transacoes;
 
@@ -19,44 +20,45 @@ app.MapPost("/clientes/{id}/transacoes", async (int id, HttpRequest request, Npg
     {
         return Results.BadRequest();
     }
-
-    Cliente cliente;
-
+    
     NpgsqlConnection? conn = null;
     NpgsqlTransaction? dbTransaction = null;
-    
+
     try
     {
+        Cliente cliente;
+        
         conn = await dataSource.OpenConnectionAsync();
         await using (dbTransaction = conn.BeginTransaction(IsolationLevel.RepeatableRead))
-        
+
         await using (var cmd = new NpgsqlCommand("SELECT id, limite, saldo FROM clientes WHERE id = $1",
                          conn,
                          dbTransaction))
         {
-            cmd.Parameters.Add(new() { Value = 1 });
-
+            cmd.Parameters.Add(new NpgsqlParameter<int> { TypedValue = id });
+            await cmd.PrepareAsync();
+            
             await using var reader = await cmd.ExecuteReaderAsync();
             if (!await reader.ReadAsync())
                 return Results.NotFound();
-            
+
 
             cliente = new Cliente(
                 reader.GetInt32(0),
-                reader.GetInt64(1),
-                reader.GetInt64(2)
+                reader.GetInt32(1),
+                reader.GetInt32(2)
             );
 
 
             cliente.ExecutaTransacao(transacao);
         }
 
-        await using (var cmd2 = new NpgsqlCommand("UPDATE clientes SET saldo = $1 WHERE id = $2", conn, dbTransaction))
+        await using (var cmd = new NpgsqlCommand("UPDATE clientes SET saldo = $1 WHERE id = $2", conn, dbTransaction))
         {
-            cmd2.Parameters.Add(new() { Value = cliente.Saldo });
-            cmd2.Parameters.Add(new() { Value = cliente.Id });
-
-            await cmd2.ExecuteNonQueryAsync();
+            cmd.Parameters.Add(new NpgsqlParameter<int> { Value = cliente.Saldo });
+            cmd.Parameters.Add(new NpgsqlParameter<int> { Value = cliente.Id });
+            await cmd.PrepareAsync();
+            await cmd.ExecuteNonQueryAsync();
         }
 
         var clienteDto = new
@@ -79,7 +81,7 @@ app.MapPost("/clientes/{id}/transacoes", async (int id, HttpRequest request, Npg
     {
         if (dbTransaction != null)
             await dbTransaction.DisposeAsync();
-        
+
         if (conn != null)
             await conn.CloseAsync();
     }
@@ -88,6 +90,32 @@ app.MapPost("/clientes/{id}/transacoes", async (int id, HttpRequest request, Npg
 
 app.MapGet("/clientes/{id}/extrato", (int id) =>
 {
+    return Results.Ok(new Extrato
+    {
+        Saldo = new Saldo
+        {
+            Total = -9098,
+            DataExtrato = DateTime.Parse("2024-01-17T02:34:41.217753Z"),
+            Limite = 100000
+        },
+        UltimasTransacoes =
+        [
+            new Transacao
+            {
+                Valor = 10,
+                Tipo = "c",
+                Descricao = "descricao",
+                RealizadaEm = DateTime.Parse("2024-01-17T02:34:38.543030Z")
+            },
+            new Transacao
+            {
+                Valor = 90000,
+                Tipo = "d",
+                Descricao = "descricao",
+                RealizadaEm = DateTime.Parse("2024-01-17T02:34:38.543030Z")
+            }
+        ]
+    });
 });
 
 app.Run();

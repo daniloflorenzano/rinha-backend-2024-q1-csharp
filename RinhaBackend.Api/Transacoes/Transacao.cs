@@ -4,12 +4,16 @@ public sealed class Transacao
 {
     public int Id { get; set; }
     public int ClienteId { get; set; }
-    public long Valor { get; set; }
+    public int Valor { get; set; }
     public string Descricao { get; set; }
     public string Tipo { get; set; }
     public DateTime RealizadaEm { get; set; } = DateTime.Now;
 
-    public Transacao(long valor, string descricao, string tipo)
+    public Transacao()
+    {
+    }
+
+    public Transacao(int valor, string descricao, string tipo)
     {
         ValidaCampos(valor, descricao, tipo);
 
