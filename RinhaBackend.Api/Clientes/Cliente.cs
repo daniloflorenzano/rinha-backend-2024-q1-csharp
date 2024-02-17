@@ -2,9 +2,9 @@ using RinhaBackend.Api.Transacoes;
 
 namespace RinhaBackend.Api.Clientes;
 
-public sealed class Cliente(int id, int limite, int saldo)
+public sealed class Cliente(int limite, int saldo)
 {
-    public int Id { get; set; } = id;
+    public int Id { get; set; }
     public int Limite { get; set; } = limite;
     public int Saldo { get; set; } = saldo;
     private int SaldoLimite => Limite * -1;

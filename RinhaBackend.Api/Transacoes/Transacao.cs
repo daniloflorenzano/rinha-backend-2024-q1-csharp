@@ -1,3 +1,5 @@
+using RinhaBackend.Api.Clientes;
+
 namespace RinhaBackend.Api.Transacoes;
 
 public sealed class Transacao
@@ -12,25 +14,16 @@ public sealed class Transacao
     public Transacao()
     {
     }
-
-    public Transacao(int valor, string descricao, string tipo)
+    
+    public void ValidaCampos()
     {
-        ValidaCampos(valor, descricao, tipo);
+        if (Valor < 0)
+            throw new TransacaoInvalidaException("Valor inválido");
 
-        Valor = valor;
-        Descricao = descricao;
-        Tipo = tipo;
-    }
+        if (string.IsNullOrWhiteSpace(Tipo) || Tipo != "c" && Tipo != "d")
+            throw new TransacaoInvalidaException("Tipo inválido");
 
-    private void ValidaCampos(long valor, string descricao, string tipo)
-    {
-        if (valor < 0)
-            throw new ArgumentException("Valor inválido", nameof(valor));
-
-        if (string.IsNullOrWhiteSpace(tipo) || tipo != "c" && tipo != "d")
-            throw new ArgumentException("Tipo inválido", nameof(tipo));
-
-        if (string.IsNullOrWhiteSpace(descricao) || descricao.Length > 10 || descricao.Length < 1)
-            throw new ArgumentException("Descrição inválida", nameof(descricao));
+        if (string.IsNullOrWhiteSpace(Descricao) || Descricao.Length > 10 || Descricao.Length < 1)
+            throw new TransacaoInvalidaException("Descrição inválida");
     }
 }
