@@ -23,5 +23,5 @@ CREATE TABLE IF NOT EXISTS transacoes
     valor        INTEGER,
     tipo         VARCHAR(1),
     descricao    VARCHAR(10),
-    realizada_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    realizada_em TIMESTAMP DEFAULT NOW()
 );

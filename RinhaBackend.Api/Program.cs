@@ -1,5 +1,7 @@
 using System.Data;
+using System.IO.Compression;
 using System.Text.Json;
+using Microsoft.AspNetCore.ResponseCompression;
 using Npgsql;
 using RinhaBackend.Api;
 using RinhaBackend.Api.Clientes;
@@ -12,10 +14,16 @@ builder.Services.AddNpgsqlDataSource(
         "DB_CONNECTION_STRING") ??
     "Username=postgres;Password=mysecretpassword;Host=localhost;Database=rinha;Pooling=true;MaxPoolSize=15;Connection Lifetime=0;");
 
-// builder.Services
-//     .AddNpgsqlDataSource(
-//         "Username=postgres;Password=mysecretpassword;Host=localhost;Database=rinha;Pooling=true;MaxPoolSize=15;Connection Lifetime=0;");
-
+//builder.Services.AddResponseCaching();
+// builder.Services.AddResponseCompression(options =>
+// {
+//     options.Providers.Add<GzipCompressionProvider>();
+// });
+//
+// builder.Services.Configure<GzipCompressionProviderOptions>(options =>
+// {
+//     options.Level = CompressionLevel.Fastest;
+// });
 
 var app = builder.Build();
 
@@ -30,14 +38,8 @@ app.MapPost("/clientes/{id}/transacoes", async (int id, HttpRequest request, Npg
 
         ResultadoRequisicao<Cliente> resultado;
         do
-        {
             resultado = await ExecutaTransacao(dataSource, transacao, id);
-            // if (!resultado.Sucesso)
-            // {
-            //     var random = new Random().Next(1, 5);
-            //     Thread.Sleep(TimeSpan.FromMilliseconds(random));
-            // }
-        } while (!resultado.Sucesso);
+        while (!resultado.Sucesso);
 
         var cliente = resultado.Retorno;
         if (cliente == null)
@@ -97,29 +99,40 @@ async Task<ResultadoRequisicao<Cliente>> ExecutaTransacao(NpgsqlDataSource dataS
                 cliente.ExecutaTransacao(transacao);
             }
 
-            await using (var cmd = new NpgsqlCommand("""
-                                                     INSERT INTO transacoes (cliente_id, valor, descricao, tipo, realizada_em)
-                                                     VALUES ($1, $2, $3, $4, $5)
-                                                     """, conn, dbTransaction))
+            NpgsqlBatchCommand criaTransacaoCmd = new(
+                """
+                INSERT INTO transacoes (cliente_id, valor, descricao, tipo)
+                VALUES ($1, $2, $3, $4)
+                """)
             {
-                cmd.Parameters.Add(new NpgsqlParameter<int> { TypedValue = clienteId });
-                cmd.Parameters.Add(new NpgsqlParameter<int> { TypedValue = transacao.Valor });
-                cmd.Parameters.Add(new NpgsqlParameter<string> { TypedValue = transacao.Descricao });
-                cmd.Parameters.Add(new NpgsqlParameter<string> { TypedValue = transacao.Tipo });
-                cmd.Parameters.Add(new NpgsqlParameter<DateTime> { TypedValue = transacao.RealizadaEm });
+                Parameters =
+                {
+                    new NpgsqlParameter<int> { TypedValue = clienteId },
+                    new NpgsqlParameter<int> { TypedValue = transacao.Valor },
+                    new NpgsqlParameter<string> { TypedValue = transacao.Descricao },
+                    new NpgsqlParameter<string> { TypedValue = transacao.Tipo },
+                }
+            };
 
-                await cmd.PrepareAsync();
-                await cmd.ExecuteNonQueryAsync();
-            }
-
-            await using (var cmd = new NpgsqlCommand("UPDATE clientes SET saldo = $1 WHERE id = $2", conn,
-                             dbTransaction))
+            NpgsqlBatchCommand atualizaSaldoCmd = new(
+                """
+                UPDATE clientes SET saldo = $1 WHERE id = $2
+                """)
             {
-                cmd.Parameters.Add(new NpgsqlParameter<int> { TypedValue = cliente.Saldo });
-                cmd.Parameters.Add(new NpgsqlParameter<int> { TypedValue = clienteId });
+                Parameters =
+                {
+                    new NpgsqlParameter<int> { TypedValue = cliente.Saldo },
+                    new NpgsqlParameter<int> { TypedValue = clienteId }
+                }
+            };
 
-                await cmd.PrepareAsync();
-                await cmd.ExecuteNonQueryAsync();
+            await using (var batch = new NpgsqlBatch(conn, dbTransaction)
+                         {
+                             BatchCommands = { criaTransacaoCmd, atualizaSaldoCmd }
+                         })
+            {
+                await batch.PrepareAsync();
+                await batch.ExecuteNonQueryAsync();
             }
 
             await dbTransaction.CommitAsync();
@@ -179,58 +192,64 @@ async Task<ResultadoRequisicao<Extrato>> ObtemExtrato(NpgsqlDataSource dataSourc
         Extrato extrato;
 
         conn = await dataSource.OpenConnectionAsync();
-        //await using (var dbTransaction = conn.BeginTransaction(IsolationLevel.RepeatableRead))
-        await using (var cmd = new NpgsqlCommand("SELECT saldo, limite FROM clientes WHERE id = $1", conn))
+
+        NpgsqlBatchCommand recuperaClienteCmd = new("SELECT saldo, limite FROM clientes WHERE id = $1")
         {
-            cmd.Parameters.Add(new NpgsqlParameter<int> { TypedValue = clienteId });
-            await cmd.PrepareAsync();
+            Parameters = { new NpgsqlParameter<int> { TypedValue = clienteId } }
+        };
 
-            await using var reader = await cmd.ExecuteReaderAsync();
-            if (!await reader.ReadAsync())
-                return new ResultadoRequisicao<Extrato>() { Sucesso = true };
+        NpgsqlBatchCommand recuperaTransacoesCmd = new("""
+                                                       SELECT valor, descricao, tipo, realizada_em FROM transacoes WHERE cliente_id = $1
+                                                          ORDER BY realizada_em DESC LIMIT 10
+                                                       """)
+        {
+            Parameters = { new NpgsqlParameter<int>() { TypedValue = clienteId } }
+        };
+        
+        
+        await using (var batch = new NpgsqlBatch(conn)
+                         { BatchCommands = { recuperaClienteCmd, recuperaTransacoesCmd } })
+        {
+            await batch.PrepareAsync();
 
-            extrato = new()
+            await using (var reader = await batch.ExecuteReaderAsync())
             {
-                Saldo = new()
+                if (!await reader.ReadAsync())
+                    return new ResultadoRequisicao<Extrato>() { Sucesso = true };
+
+                extrato = new()
                 {
-                    Total = reader.GetInt32(0),
-                    Limite = reader.GetInt32(1),
-                    DataExtrato = DateTime.Now
+                    Saldo = new()
+                    {
+                        Total = reader.GetInt32(0),
+                        Limite = reader.GetInt32(1),
+                        DataExtrato = DateTime.Now
+                    }
+                };
+
+                await reader.NextResultAsync();
+
+                if (!await reader.ReadAsync())
+                {
+                    extrato.UltimasTransacoes = new List<Transacao>();
+                    return new ResultadoRequisicao<Extrato>() { Sucesso = true, Retorno = extrato };
                 }
-            };
-        }
 
-        await using (var cmd = new NpgsqlCommand(
-                         """
-                         SELECT valor, descricao, tipo, realizada_em FROM transacoes WHERE cliente_id = $1
-                            ORDER BY realizada_em DESC LIMIT 10
-                         """, conn))
-        {
-            cmd.Parameters.Add(new NpgsqlParameter<int> { TypedValue = clienteId });
-            await cmd.PrepareAsync();
+                var transacoes = new List<Transacao>();
 
-            await using var reader = await cmd.ExecuteReaderAsync();
-
-            if (!await reader.ReadAsync())
-            {
-                extrato.UltimasTransacoes = new List<Transacao>();
-                return new ResultadoRequisicao<Extrato>() { Sucesso = true, Retorno = extrato };
-            }
-
-            var transacoes = new List<Transacao>();
-
-            do
-            {
-                transacoes.Add(new()
+                do
                 {
-                    Valor = reader.GetInt32(0),
-                    Descricao = reader.GetString(1),
-                    Tipo = reader.GetString(2),
-                    RealizadaEm = reader.GetDateTime(3)
-                });
-            } while (await reader.ReadAsync());
+                    transacoes.Add(new()
+                    {
+                        Valor = reader.GetInt32(0),
+                        Descricao = reader.GetString(1),
+                        Tipo = reader.GetString(2),
+                        RealizadaEm = reader.GetDateTime(3)
+                    });
+                } while (await reader.ReadAsync());
 
-            extrato.UltimasTransacoes = transacoes;
+                extrato.UltimasTransacoes = transacoes;
+            }
         }
 
         await conn.CloseAsync();

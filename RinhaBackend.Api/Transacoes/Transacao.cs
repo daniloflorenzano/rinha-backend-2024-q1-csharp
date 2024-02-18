@@ -4,8 +4,6 @@ namespace RinhaBackend.Api.Transacoes;
 
 public sealed class Transacao
 {
-    public int Id { get; set; }
-    public int ClienteId { get; set; }
     public int Valor { get; set; }
     public string Descricao { get; set; }
     public string Tipo { get; set; }

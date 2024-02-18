@@ -10,7 +10,7 @@ services:
       dockerfile: RinhaBackend.Api/Dockerfile
     hostname: api01
     environment:
-      - DB_CONNECTION_STRING=Username=admin;Password=123;Host=db;Database=rinha;Pooling=true;Maximum Pool Size=15;No Reset On Close=true;Connection Lifetime=0;
+      - DB_CONNECTION_STRING=Username=admin;Password=123;Host=db;Database=rinha;Pooling=true;Maximum Pool Size=12;No Reset On Close=true;Connection Lifetime=0;
       - ASPNETCORE_URLS=http://+:8080;
     
     # Não é necessário expor qualquer porta além da porta do load balancer,
@@ -31,7 +31,7 @@ services:
     <<: *api
     hostname: api02
     environment:
-      - DB_CONNECTION_STRING=Username=admin;Password=123;Host=db;Database=rinha;Pooling=true;Maximum Pool Size=15;No Reset On Close=true;Connection Lifetime=0;
+      - DB_CONNECTION_STRING=Username=admin;Password=123;Host=db;Database=rinha;Pooling=true;Maximum Pool Size=12;No Reset On Close=true;Connection Lifetime=0;
       - ASPNETCORE_URLS=http://+:8080
     ports:
       - "8080"
