@@ -1,7 +1,5 @@
 using System.Data;
-using System.IO.Compression;
 using System.Text.Json;
-using Microsoft.AspNetCore.ResponseCompression;
 using Npgsql;
 using RinhaBackend.Api;
 using RinhaBackend.Api.Clientes;
@@ -13,17 +11,6 @@ builder.Services.AddNpgsqlDataSource(
     Environment.GetEnvironmentVariable(
         "DB_CONNECTION_STRING") ??
     "Username=postgres;Password=mysecretpassword;Host=localhost;Database=rinha;Pooling=true;MaxPoolSize=15;Connection Lifetime=0;");
-
-//builder.Services.AddResponseCaching();
-// builder.Services.AddResponseCompression(options =>
-// {
-//     options.Providers.Add<GzipCompressionProvider>();
-// });
-//
-// builder.Services.Configure<GzipCompressionProviderOptions>(options =>
-// {
-//     options.Level = CompressionLevel.Fastest;
-// });
 
 var app = builder.Build();
 
