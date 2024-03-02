@@ -3,6 +3,7 @@ using System.Text.Json;
 using Npgsql;
 using RinhaBackend.Api;
 using RinhaBackend.Api.Clientes;
+using RinhaBackend.Api.Extratos;
 using RinhaBackend.Api.Transacoes;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -31,7 +32,6 @@ app.MapPost("/clientes/{id}/transacoes", async (int id, HttpRequest request, Npg
 
             if (!resultado.Sucesso)
                 await Task.Delay(new Random().Next(400, 1000));
-            
         } while (!resultado.Sucesso);
 
         var cliente = resultado.Retorno;
@@ -103,7 +103,7 @@ async Task<ResultadoRequisicao<Cliente>> ExecutaTransacao(NpgsqlDataSource dataS
                     new NpgsqlParameter<int> { TypedValue = clienteId },
                     new NpgsqlParameter<int> { TypedValue = transacao.Valor },
                     new NpgsqlParameter<string> { TypedValue = transacao.Descricao },
-                    new NpgsqlParameter<char> { TypedValue = transacao.Tipo },
+                    new NpgsqlParameter<char> { TypedValue = transacao.Tipo }
                 }
             };
 
@@ -196,7 +196,7 @@ async Task<ResultadoRequisicao<Extrato>> ObtemExtrato(NpgsqlDataSource dataSourc
                                                           ORDER BY realizada_em DESC LIMIT 10
                                                        """)
         {
-            Parameters = { new NpgsqlParameter<int>() { TypedValue = clienteId } }
+            Parameters = { new NpgsqlParameter<int> { TypedValue = clienteId } }
         };
 
 
@@ -208,11 +208,11 @@ async Task<ResultadoRequisicao<Extrato>> ObtemExtrato(NpgsqlDataSource dataSourc
             await using (var reader = await batch.ExecuteReaderAsync())
             {
                 if (!await reader.ReadAsync())
-                    return new ResultadoRequisicao<Extrato>() { Sucesso = true };
+                    return new ResultadoRequisicao<Extrato> { Sucesso = true };
 
-                extrato = new()
+                extrato = new Extrato
                 {
-                    saldo = new()
+                    saldo = new Saldo
                     {
                         Total = reader.GetInt32(0),
                         Limite = reader.GetInt32(1),
@@ -225,14 +225,14 @@ async Task<ResultadoRequisicao<Extrato>> ObtemExtrato(NpgsqlDataSource dataSourc
                 if (!await reader.ReadAsync())
                 {
                     extrato.ultimas_transacoes = new List<Transacao>();
-                    return new ResultadoRequisicao<Extrato>() { Sucesso = true, Retorno = extrato };
+                    return new ResultadoRequisicao<Extrato> { Sucesso = true, Retorno = extrato };
                 }
 
                 var transacoes = new List<Transacao>();
 
                 do
                 {
-                    transacoes.Add(new()
+                    transacoes.Add(new Transacao
                     {
                         Valor = reader.GetInt32(0),
                         Descricao = reader.GetString(1),
@@ -247,11 +247,11 @@ async Task<ResultadoRequisicao<Extrato>> ObtemExtrato(NpgsqlDataSource dataSourc
 
         await conn.CloseAsync();
 
-        return new ResultadoRequisicao<Extrato>() { Sucesso = true, Retorno = extrato };
+        return new ResultadoRequisicao<Extrato> { Sucesso = true, Retorno = extrato };
     }
     catch (NpgsqlException)
     {
-        return new ResultadoRequisicao<Extrato>() { Sucesso = false };
+        return new ResultadoRequisicao<Extrato> { Sucesso = false };
     }
     catch (Exception e)
     {

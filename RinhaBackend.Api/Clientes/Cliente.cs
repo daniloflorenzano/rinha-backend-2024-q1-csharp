@@ -20,17 +20,17 @@ public sealed class Cliente(int limite, int saldo)
             case 'c':
                 saldo += transacao.Valor;
                 break;
-            
+
             case 'd':
             {
                 var novoSaldo = saldo - transacao.Valor;
 
                 if (novoSaldo > SaldoLimite)
                     saldo = novoSaldo;
-                
+
                 break;
             }
-            
+
             default:
                 throw new TransacaoInvalidaException("Limite insuficiente");
         }

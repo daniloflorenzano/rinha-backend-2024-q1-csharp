@@ -9,14 +9,14 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <Content Include="..\.dockerignore">
-        <Link>.dockerignore</Link>
-      </Content>
+        <Content Include="..\.dockerignore">
+            <Link>.dockerignore</Link>
+        </Content>
     </ItemGroup>
 
     <ItemGroup>
-      <PackageReference Include="Npgsql" Version="8.0.1" />
-      <PackageReference Include="Npgsql.DependencyInjection" Version="8.0.1" />
+        <PackageReference Include="Npgsql" Version="8.0.1"/>
+        <PackageReference Include="Npgsql.DependencyInjection" Version="8.0.1"/>
     </ItemGroup>
 
 </Project>

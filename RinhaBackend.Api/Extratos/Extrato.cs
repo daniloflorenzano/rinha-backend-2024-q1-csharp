@@ -1,6 +1,6 @@
 using RinhaBackend.Api.Transacoes;
 
-namespace RinhaBackend.Api;
+namespace RinhaBackend.Api.Extratos;
 
 public sealed class Extrato
 {

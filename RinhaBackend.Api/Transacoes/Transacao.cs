@@ -1,5 +1,3 @@
-using RinhaBackend.Api.Clientes;
-
 namespace RinhaBackend.Api.Transacoes;
 
 public sealed class Transacao
@@ -9,10 +7,6 @@ public sealed class Transacao
     public char Tipo { get; set; }
     public DateTime RealizadaEm { get; set; } = DateTime.Now;
 
-    public Transacao()
-    {
-    }
-    
     public void ValidaCampos()
     {
         if (Valor < 0)
