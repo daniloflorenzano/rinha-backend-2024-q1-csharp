@@ -19,9 +19,11 @@ END;
 CREATE TABLE IF NOT EXISTS transacoes
 (
     id           SERIAL,
-    cliente_id   INTEGER REFERENCES clientes (id),
+    cliente_id   INTEGER,
     valor        INTEGER,
-    tipo         VARCHAR(1),
+    tipo         CHAR(1),
     descricao    VARCHAR(10),
     realizada_em TIMESTAMP DEFAULT NOW()
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS transacoes_id_idx ON transacoes (id);
