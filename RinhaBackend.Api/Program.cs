@@ -23,10 +23,16 @@ app.MapPost("/clientes/{id}/transacoes", async (int id, HttpRequest request, Npg
             return Results.BadRequest();
         transacao.ValidaCampos();
 
+
         ResultadoRequisicao<Cliente> resultado;
         do
+        {
             resultado = await ExecutaTransacao(dataSource, transacao, id);
-        while (!resultado.Sucesso);
+
+            if (!resultado.Sucesso)
+                await Task.Delay(new Random().Next(400, 1000));
+            
+        } while (!resultado.Sucesso);
 
         var cliente = resultado.Retorno;
         if (cliente == null)
@@ -34,7 +40,7 @@ app.MapPost("/clientes/{id}/transacoes", async (int id, HttpRequest request, Npg
 
         var clienteDto = new
         {
-            cliente.Limite, cliente.Saldo
+            Limite = cliente.limite, Saldo = cliente.saldo
         };
 
         return Results.Ok(clienteDto);
@@ -97,7 +103,7 @@ async Task<ResultadoRequisicao<Cliente>> ExecutaTransacao(NpgsqlDataSource dataS
                     new NpgsqlParameter<int> { TypedValue = clienteId },
                     new NpgsqlParameter<int> { TypedValue = transacao.Valor },
                     new NpgsqlParameter<string> { TypedValue = transacao.Descricao },
-                    new NpgsqlParameter<string> { TypedValue = transacao.Tipo },
+                    new NpgsqlParameter<char> { TypedValue = transacao.Tipo },
                 }
             };
 
@@ -108,7 +114,7 @@ async Task<ResultadoRequisicao<Cliente>> ExecutaTransacao(NpgsqlDataSource dataS
             {
                 Parameters =
                 {
-                    new NpgsqlParameter<int> { TypedValue = cliente.Saldo },
+                    new NpgsqlParameter<int> { TypedValue = cliente.saldo },
                     new NpgsqlParameter<int> { TypedValue = clienteId }
                 }
             };
@@ -192,8 +198,8 @@ async Task<ResultadoRequisicao<Extrato>> ObtemExtrato(NpgsqlDataSource dataSourc
         {
             Parameters = { new NpgsqlParameter<int>() { TypedValue = clienteId } }
         };
-        
-        
+
+
         await using (var batch = new NpgsqlBatch(conn)
                          { BatchCommands = { recuperaClienteCmd, recuperaTransacoesCmd } })
         {
@@ -206,11 +212,11 @@ async Task<ResultadoRequisicao<Extrato>> ObtemExtrato(NpgsqlDataSource dataSourc
 
                 extrato = new()
                 {
-                    Saldo = new()
+                    saldo = new()
                     {
                         Total = reader.GetInt32(0),
                         Limite = reader.GetInt32(1),
-                        DataExtrato = DateTime.Now
+                        Data_Extrato = DateTime.Now
                     }
                 };
 
@@ -218,7 +224,7 @@ async Task<ResultadoRequisicao<Extrato>> ObtemExtrato(NpgsqlDataSource dataSourc
 
                 if (!await reader.ReadAsync())
                 {
-                    extrato.UltimasTransacoes = new List<Transacao>();
+                    extrato.ultimas_transacoes = new List<Transacao>();
                     return new ResultadoRequisicao<Extrato>() { Sucesso = true, Retorno = extrato };
                 }
 
@@ -230,12 +236,12 @@ async Task<ResultadoRequisicao<Extrato>> ObtemExtrato(NpgsqlDataSource dataSourc
                     {
                         Valor = reader.GetInt32(0),
                         Descricao = reader.GetString(1),
-                        Tipo = reader.GetString(2),
+                        Tipo = reader.GetChar(2),
                         RealizadaEm = reader.GetDateTime(3)
                     });
                 } while (await reader.ReadAsync());
 
-                extrato.UltimasTransacoes = transacoes;
+                extrato.ultimas_transacoes = transacoes;
             }
         }
 

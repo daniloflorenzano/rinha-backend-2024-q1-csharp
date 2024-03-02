@@ -4,10 +4,10 @@ namespace RinhaBackend.Api.Clientes;
 
 public sealed class Cliente(int limite, int saldo)
 {
-    public int Id { get; set; }
-    public int Limite { get; set; } = limite;
-    public int Saldo { get; set; } = saldo;
-    private int SaldoLimite => Limite * -1;
+    public int id { get; set; }
+    public int limite { get; set; } = limite;
+    public int saldo { get; set; } = saldo;
+    private int SaldoLimite => limite * -1;
 
     public void ExecutaTransacao(Transacao transacao)
     {
@@ -17,16 +17,16 @@ public sealed class Cliente(int limite, int saldo)
 
         switch (transacao.Tipo)
         {
-            case "c":
-                Saldo += transacao.Valor;
+            case 'c':
+                saldo += transacao.Valor;
                 break;
             
-            case "d":
+            case 'd':
             {
-                var novoSaldo = Saldo - transacao.Valor;
+                var novoSaldo = saldo - transacao.Valor;
 
                 if (novoSaldo > SaldoLimite)
-                    Saldo = novoSaldo;
+                    saldo = novoSaldo;
                 
                 break;
             }
