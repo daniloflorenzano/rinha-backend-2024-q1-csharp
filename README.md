@@ -1,4 +1,4 @@
-## Projeto para Rinha de Backend 2024/Q1
+# Projeto para Rinha de Backend 2024/Q1
 [Repositório da Rinha](https://github.com/zanfranceschi/rinha-de-backend-2024-q1)
 
 ## Tecnologias utilizadas
